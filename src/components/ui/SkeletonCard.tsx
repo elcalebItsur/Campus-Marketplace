@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
     },
     image: {
         width: '100%',
-        height: 140,
+        aspectRatio: 4 / 3,
         backgroundColor: colors.backgroundAlt,
     },
     content: {

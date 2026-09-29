@@ -20,6 +20,7 @@ import { useDebounce } from '@/utils/useDebounce';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
 import { PWAInstallPrompt } from '@/components/ui/PWAInstallPrompt';
 import { filterProducts } from '@/utils/productFilters';
+import { formatPrice } from '@/utils/text';
 import { logger } from '@/utils/logger';
 
 import type { ComponentProps } from 'react';
@@ -34,11 +35,18 @@ const CATEGORIES: CategoryItem[] = [
     { label: 'Servicios', icon: 'construct-outline' },
     { label: 'Otros', icon: 'cube-outline' },
 ];
+const CONDITION_LABELS: Record<string, string> = {
+    new: 'Nuevo',
+    good: 'Buen estado',
+    fair: 'Desgastado',
+};
 
 export default function HomeScreen() {
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadError, setLoadError] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
     const [activeCategory, setActiveCategory] = useState<string>('Todos');
     const [showMarketplace, setShowMarketplace] = useState(false);
     const [gridWidth, setGridWidth] = useState(0);
@@ -63,24 +71,22 @@ export default function HomeScreen() {
 
     useEffect(() => {
         setLoading(true);
-        const unsubscribe = subscribeToProducts((data) => {
+        setLoadError(false);
+        const unsubscribe = subscribeToProducts((data, hasError) => {
             setProducts(data);
+            setLoadError(Boolean(hasError));
             setLoading(false);
+            setRefreshing(false);
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [refreshKey]);
 
-    const loadProducts = async () => {
+    const handleRefresh = () => {
         setRefreshing(true);
-        await new Promise(r => setTimeout(r, 800));
-        setRefreshing(false);
-    };
-
-    const handleRefresh = async () => {
-        setRefreshing(true);
-        await loadProducts();
-        setRefreshing(false);
+        setLoading(true);
+        setLoadError(false);
+        setRefreshKey(current => current + 1);
     };
 
     const normalize = (s: string) =>
@@ -94,6 +100,19 @@ export default function HomeScreen() {
         maxPrice,
         condition: selectedCondition
     });
+    const activeFilters: string[] = [];
+    if (activeCategory !== 'Todos') activeFilters.push(activeCategory);
+    if (searchQuery.trim()) activeFilters.push(`"${searchQuery.trim()}"`);
+    if (minPrice || maxPrice) activeFilters.push(`Precio ${minPrice || '0'}-${maxPrice || 'sin máximo'}`);
+    if (selectedCondition) activeFilters.push(CONDITION_LABELS[selectedCondition] || selectedCondition);
+    const hasActiveFilters = activeFilters.length > 0;
+    const clearFilters = () => {
+        setActiveCategory('Todos');
+        setSearchQuery('');
+        setMinPrice('');
+        setMaxPrice('');
+        setSelectedCondition(null);
+    };
 
     const firstName = user?.displayName?.split(' ')[0] || 'Estudiante';
 
@@ -133,6 +152,14 @@ export default function HomeScreen() {
         <View style={[styles.root, !isLargeScreen && { backgroundColor: colors.primary }]}>
             <ScrollView 
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        tintColor={colors.primary}
+                        colors={[colors.primary]}
+                    />
+                }
                 style={{ backgroundColor: colors.background }}
                 contentContainerStyle={[
                     isLargeScreen && styles.scrollContentWeb,
@@ -318,13 +345,17 @@ export default function HomeScreen() {
                                 </ScrollView>
                             </View>
 
-                            {debouncedSearch.trim().length > 0 && !loading && (
+                            {!loading && (
                                 <View style={styles.searchResultsBanner}>
                                     <Text style={styles.searchResultsText}>
-                                        {filteredProducts.length === 0
-                                            ? `Sin resultados para "${debouncedSearch.trim()}"`
-                                            : `${filteredProducts.length} resultado${filteredProducts.length !== 1 ? 's' : ''} para "${debouncedSearch.trim()}"`}
+                                        {filteredProducts.length} {filteredProducts.length === 1 ? 'resultado' : 'resultados'}
+                                        {hasActiveFilters ? ` | ${activeFilters.join(' | ')}` : ' disponibles'}
                                     </Text>
+                                    {hasActiveFilters && (
+                                        <TouchableOpacity onPress={clearFilters} accessibilityRole="button">
+                                            <Text style={styles.clearFiltersText}>Limpiar</Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
                             )}
 
@@ -338,6 +369,20 @@ export default function HomeScreen() {
                             >
                                 {loading ? (
                                     renderSkeletons()
+                                ) : loadError ? (
+                                    <View style={styles.center}>
+                                        <Ionicons name="cloud-offline-outline" size={56} color={colors.textMuted} />
+                                        <Text style={styles.emptyTitle}>No pudimos cargar los productos</Text>
+                                        <Text style={styles.emptySubtitle}>Revisa tu conexión e intenta de nuevo.</Text>
+                                        <TouchableOpacity
+                                            style={styles.retryButton}
+                                            onPress={handleRefresh}
+                                            accessibilityRole="button"
+                                        >
+                                            <Ionicons name="refresh" size={18} color="#fff" />
+                                            <Text style={styles.retryButtonText}>Intentar de nuevo</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 ) : filteredProducts.length === 0 ? (
                                     <View style={styles.center}>
                                         <Ionicons
@@ -386,7 +431,7 @@ export default function HomeScreen() {
                                             <Image source={{ uri: p.images?.[0] }} style={styles.recentThumb as any} />
                                             <View style={styles.recentInfo}>
                                                 <Text style={styles.recentTitle} numberOfLines={1}>{p.title}</Text>
-                                                <Text style={styles.recentPrice}>${p.price}</Text>
+                                                <Text style={styles.recentPrice}>{formatPrice(p.price)}</Text>
                                             </View>
                                         </TouchableOpacity>
                                     ))}
@@ -460,8 +505,7 @@ export default function HomeScreen() {
                             {/* Condition */}
                             <Text style={styles.filterLabel}>Estado del Producto</Text>
                             <View style={styles.conditionRow}>
-                                {['new', 'good', 'fair'].map(cond => {
-                                    const labels: any = { new: 'Nuevo', good: 'Buen estado', fair: 'Desgastado' };
+                                {Object.entries(CONDITION_LABELS).map(([cond, label]) => {
                                     const isActive = selectedCondition === cond;
                                     return (
                                         <TouchableOpacity
@@ -470,7 +514,7 @@ export default function HomeScreen() {
                                             onPress={() => setSelectedCondition(isActive ? null : cond)}
                                         >
                                             <Text style={[styles.conditionChipText, isActive && styles.conditionChipTextActive]}>
-                                                {labels[cond]}
+                                                {label}
                                             </Text>
                                         </TouchableOpacity>
                                     );
@@ -479,12 +523,7 @@ export default function HomeScreen() {
 
                             <TouchableOpacity 
                                 style={styles.resetBtn}
-                                onPress={() => {
-                                    setMinPrice('');
-                                    setMaxPrice('');
-                                    setSelectedCondition(null);
-                                    setActiveCategory('Todos');
-                                }}
+                                onPress={clearFilters}
                             >
                                 <Text style={styles.resetBtnText}>Limpiar todos los filtros</Text>
                             </TouchableOpacity>
@@ -804,18 +843,23 @@ const styles = StyleSheet.create({
         paddingVertical: 2,
     },
     searchResultsBanner: {
-        backgroundColor: colors.infoLight,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-        borderRadius: 12,
-        marginBottom: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 8,
+        paddingVertical: 8,
+        marginBottom: 4,
     },
     searchResultsText: {
         ...typography.presets.caption,
-        color: colors.info,
+        flex: 1,
+        color: colors.textSecondary,
         fontWeight: '600',
+    },
+    clearFiltersText: {
+        ...typography.presets.label,
+        color: colors.primary,
     },
     categoriesSection: {
         backgroundColor: colors.surface,
@@ -902,6 +946,21 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         paddingHorizontal: 40,
         maxWidth: 400,
+    },
+    retryButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: colors.primary,
+        borderRadius: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        marginTop: 8,
+    },
+    retryButtonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '700',
     },
 
     // ─── Filter & Search Phase 2 Styles ─────────────────────────────────

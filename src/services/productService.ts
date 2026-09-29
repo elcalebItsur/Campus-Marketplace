@@ -99,7 +99,7 @@ export const getMyProducts = async (userId: string): Promise<Product[]> => {
 
 /** Subscribe to active products */
 export const subscribeToProducts = (
-    callback: (products: Product[]) => void
+    callback: (products: Product[], hasError?: boolean) => void
 ): () => void => {
     const q = query(
         collection(db, COLLECTION),
@@ -115,7 +115,7 @@ export const subscribeToProducts = (
         callback(sorted);
     }, (err) => {
         logger.error('subscribeToProducts error:', err);
-        callback([]);
+        callback([], true);
     });
 };
 

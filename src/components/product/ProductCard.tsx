@@ -12,6 +12,7 @@ import {
 import { Product } from '@/types/product';
 import { colors } from '@/theme/colors';
 import { typography } from '@/theme/typography';
+import { formatPrice } from '@/utils/text';
 import { Ionicons } from '@expo/vector-icons';
 import { UserAvatar } from '../ui/UserAvatar';
 
@@ -102,7 +103,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 {/* Image / Fallback */}
                 <View style={styles.imageContainer}>
                     {imageUri && (imageUri.startsWith('data:') || imageUri.startsWith('http')) ? (
-                        <Image source={{ uri: imageUri }} style={styles.image} />
+                        <Image source={{ uri: imageUri }} style={styles.image} resizeMode="cover" />
                     ) : (
                         <View style={[styles.imageFallback, { backgroundColor: catColor }]}>
                             <Ionicons
@@ -114,7 +115,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                     )}
                     {/* Price badge */}
                     <View style={styles.priceBadge}>
-                        <Text style={styles.priceText}>${product.price.toFixed(2)}</Text>
+                        <Text style={styles.priceText}>{formatPrice(product.price)}</Text>
                     </View>
                     {/* Status badge (only in My Products) */}
                     {showStatus && (
@@ -188,12 +189,11 @@ const styles = StyleSheet.create({
     imageContainer: {
         position: 'relative',
         width: '100%',
-        height: 150,
+        aspectRatio: 4 / 3,
     },
     image: {
         width: '100%',
         height: '100%',
-        resizeMode: 'cover',
     },
     imageFallback: {
         width: '100%',
@@ -253,6 +253,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: colors.text,
         lineHeight: 20,
+        minHeight: 40,
         marginBottom: 8,
     },
     sellerRow: {
