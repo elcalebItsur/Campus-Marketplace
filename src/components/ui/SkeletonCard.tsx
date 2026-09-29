@@ -4,15 +4,16 @@ import { colors } from '@/theme/colors';
 
 interface SkeletonCardProps {
     numColumns?: number;
+    cardWidth?: number;
 }
 
-export const SkeletonCard: React.FC<SkeletonCardProps> = ({ numColumns = 2 }) => {
+export const SkeletonCard: React.FC<SkeletonCardProps> = ({ numColumns = 2, cardWidth: measuredCardWidth }) => {
     const { width } = useWindowDimensions();
     const opacity = useRef(new Animated.Value(0.3)).current;
 
     const horizontalPadding = 24;
     const gap = 10;
-    const cardWidth = (width - horizontalPadding - (numColumns - 1) * gap) / numColumns;
+    const cardWidth = measuredCardWidth ?? (width - horizontalPadding - (numColumns - 1) * gap) / numColumns;
 
     useEffect(() => {
         const animation = Animated.loop(

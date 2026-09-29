@@ -41,6 +41,7 @@ export default function HomeScreen() {
     const [refreshing, setRefreshing] = useState(false);
     const [activeCategory, setActiveCategory] = useState<string>('Todos');
     const [showMarketplace, setShowMarketplace] = useState(false);
+    const [gridWidth, setGridWidth] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [showFilters, setShowFilters] = useState(false);
     const [minPrice, setMinPrice] = useState('');
@@ -52,22 +53,13 @@ export default function HomeScreen() {
     const insets = useSafeAreaInsets();
     const { width } = useWindowDimensions();
 
-    const isLargeScreen = width > 800;
+    const isLargeScreen = width > 1080;
     const isMobileWeb = Platform.OS === 'web' && width <= 800;
 
-    // Responsive columns logic
-    const handleLoadMore = () => {
-        // No manual pagination needed in real-time mode
-    };
-
-    const getColumns = () => {
-        if (width >= 1400) return 6;
-        if (width >= 1100) return 4;
-        if (width >= 768) return 3;
-        return 2;
-    };
-
-    const numColumns = getColumns();
+    const fallbackGridWidth = Math.max(width - (isLargeScreen ? 670 : 0), 0);
+    const availableGridWidth = Math.max((gridWidth || fallbackGridWidth) - 32, 0);
+    const numColumns = Math.min(4, Math.max(1, Math.floor((availableGridWidth + 10) / 170)));
+    const cardWidth = (availableGridWidth - (numColumns - 1) * 10) / numColumns;
 
     useEffect(() => {
         setLoading(true);
@@ -110,7 +102,7 @@ export default function HomeScreen() {
         return (
             <View style={[styles.list, { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }]}>
                 {skeletons.map((_, i) => (
-                    <SkeletonCard key={`skel-${i}`} numColumns={numColumns} />
+                    <SkeletonCard key={`skel-${i}`} numColumns={numColumns} cardWidth={cardWidth} />
                 ))}
             </View>
         );
@@ -337,7 +329,13 @@ export default function HomeScreen() {
                             )}
 
                             {/* Products grid */}
-                            <View style={styles.gridContainer}>
+                            <View
+                                style={styles.gridContainer}
+                                onLayout={({ nativeEvent }) => {
+                                    const nextWidth = Math.round(nativeEvent.layout.width);
+                                    setGridWidth(current => current === nextWidth ? current : nextWidth);
+                                }}
+                            >
                                 {loading ? (
                                     renderSkeletons()
                                 ) : filteredProducts.length === 0 ? (
@@ -366,6 +364,7 @@ export default function HomeScreen() {
                                                 product={item}
                                                 onPress={() => router.push(`/products/${item.id}`)}
                                                 numColumns={numColumns}
+                                                cardWidth={cardWidth}
                                             />
                                         ))}
                                     </View>

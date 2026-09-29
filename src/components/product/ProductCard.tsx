@@ -20,6 +20,7 @@ interface ProductCardProps {
     onPress: () => void;
     showStatus?: boolean;
     numColumns?: number;
+    cardWidth?: number;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -35,7 +36,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     product, 
     onPress, 
     showStatus = false,
-    numColumns = 2
+    numColumns = 2,
+    cardWidth: measuredCardWidth
 }) => {
     const scale = useRef(new Animated.Value(1)).current;
     const hoverScale = useRef(new Animated.Value(1)).current;
@@ -45,7 +47,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     // Responsive card width calculation
     const horizontalPadding = 32; // Matching the 16px padding on each side of the list
     const gap = 10;
-    const cardWidth = (width - horizontalPadding - (numColumns - 1) * gap) / numColumns;
+    const cardWidth = measuredCardWidth ?? (width - horizontalPadding - (numColumns - 1) * gap) / numColumns;
 
     const handlePressIn = () => {
         Animated.spring(scale, { toValue: 0.96, useNativeDriver: true, speed: 50 }).start();
