@@ -1,4 +1,4 @@
-import { ScrollViewStyleReset } from 'react-native-css-interop';
+import { ScrollViewStyleReset } from 'expo-router/html';
 import type { PropsWithChildren } from 'react';
 
 /**
